@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import express from 'express';
 import { google } from 'googleapis';
 import crypto from 'crypto';
@@ -33,16 +33,6 @@ const CHANNEL_TEAM2_BLAU = process.env.CHANNEL_TEAM2_BLAU!;
 const CHANNEL_TEAM3_ROT = process.env.CHANNEL_TEAM3_ROT!;
 const CHANNEL_TEAM4_BLAU = process.env.CHANNEL_TEAM4_BLAU!;
 
-// Google Sheets Auth
-const sheets = google.sheets({
-  version: 'v4',
-  auth: new google.auth.JWT({
-    email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: GOOGLE_PRIVATE_KEY,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  }),
-});
-
 // Discord Bot Ready
 client.on('ready', () => {
   console.log(`✅ Bot logged in as ${client.user?.tag}`);
@@ -56,6 +46,7 @@ app.post('/api/webhook/teams', (req, res) => {
   const hash = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');
 
   if (signature !== hash) {
+    console.warn('❌ Invalid webhook signature');
     return res.status(401).json({ error: 'Invalid signature' });
   }
 
@@ -64,40 +55,55 @@ app.post('/api/webhook/teams', (req, res) => {
   res.json({ success: true });
 });
 
+// Health Check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', bot: client.isReady() });
+});
+
 // Teams zu Discord posten
 async function postTeamsToDiscord(teams: any[]) {
-  const guild = await client.guilds.fetch(DISCORD_TEST_SERVER_ID);
+  try {
+    const guild = await client.guilds.fetch(DISCORD_TEST_SERVER_ID);
+    console.log(`📍 Guild fetched: ${guild.name}`);
 
-  // Kanäle holen
-  const channelArena = await guild.channels.fetch(CHANNEL_ARENA);
-  const channelTeam1 = await guild.channels.fetch(CHANNEL_TEAM1_ROT);
-  const channelTeam2 = await guild.channels.fetch(CHANNEL_TEAM2_BLAU);
-  const channelTeam3 = await guild.channels.fetch(CHANNEL_TEAM3_ROT);
-  const channelTeam4 = await guild.channels.fetch(CHANNEL_TEAM4_BLAU);
+    // Kanäle holen
+    const channelArena = await guild.channels.fetch(CHANNEL_ARENA);
+    const channelTeam1 = await guild.channels.fetch(CHANNEL_TEAM1_ROT);
+    const channelTeam2 = await guild.channels.fetch(CHANNEL_TEAM2_BLAU);
+    const channelTeam3 = await guild.channels.fetch(CHANNEL_TEAM3_ROT);
+    const channelTeam4 = await guild.channels.fetch(CHANNEL_TEAM4_BLAU);
 
-  const channels = [channelTeam1, channelTeam2, channelTeam3, channelTeam4];
+    const channels = [channelTeam1, channelTeam2, channelTeam3, channelTeam4];
 
-  // Teams posten
-  for (let i = 0; i < teams.length; i++) {
-    const team = teams[i];
-    const channel = channels[i];
+    // Teams posten
+    for (let i = 0; i < teams.length; i++) {
+      const team = teams[i];
+      const channel = channels[i];
 
-    if (!channel || !channel.isTextBased()) continue;
+      if (!channel || !channel.isTextBased()) {
+        console.warn(`⚠️ Channel ${i + 1} not found or not text-based`);
+        continue;
+      }
 
-    const embed = {
-      title: `Team ${i + 1}`,
-      color: team.color === 'ROT' ? 0xff0000 : 0x0000ff,
-      fields: team.members.map((member: any) => ({
-        name: member.name,
-        value: `${member.class} - ${member.role}`,
-        inline: true,
-      })),
-    };
+      const embed = new EmbedBuilder()
+        .setTitle(`Team ${i + 1}`)
+        .setColor(team.color === 'ROT' ? 0xff0000 : 0x0000ff)
+        .addFields(
+          team.members.map((member: any) => ({
+            name: member.name,
+            value: `${member.class} - ${member.role}`,
+            inline: true,
+          }))
+        );
 
-    await (channel as any).send({ embeds: [embed] });
+      await (channel as any).send({ embeds: [embed] });
+      console.log(`✅ Team ${i + 1} posted to ${(channel as any).name}`);
+    }
+
+    console.log('✅ All teams posted to Discord');
+  } catch (error) {
+    console.error('❌ Error posting teams:', error);
   }
-
-  console.log('✅ Teams posted to Discord');
 }
 
 // Bot starten
