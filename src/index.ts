@@ -25,7 +25,12 @@ const GOOGLE_SHEETS_ID = process.env.GOOGLE_SHEETS_ID ?? '';
 const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? '';
 const GOOGLE_PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n');
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET ?? '';
-const WEBHOOK_PORT = parseInt(process.env.WEBHOOK_PORT || '3000');
+const PORT = Number(process.env.PORT) || 3000;
+
+// Express Server starten
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Webhook server running on port ${PORT}`);
+});
 
 const CHANNEL_ARENA = process.env.CHANNEL_ARENA ?? '';
 const CHANNEL_TEAM1_ROT = process.env.CHANNEL_TEAM1_ROT ?? '';
