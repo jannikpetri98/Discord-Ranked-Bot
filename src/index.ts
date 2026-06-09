@@ -56,12 +56,23 @@ app.post('/api/webhook/teams', (req, res) => {
   }
 
   const signature = req.headers['x-webhook-signature'] as string;
-  const body = JSON.stringify(req.body);
-  const hash = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');
+const body = JSON.stringify(req.body);
+const hash = crypto
+  .createHmac('sha256', WEBHOOK_SECRET)
+  .update(body)
+  .digest('hex');
 
-  if (signature !== hash) {
-    console.warn('❌ Invalid webhook signature');
-    return res.status(401).json({ error: 'Invalid signature' });
+// DEBUG
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log('Received Signature :', signature);
+console.log('Calculated Signature:', hash);
+console.log('Body:', body);
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+if (signature !== hash) {
+  console.warn('❌ Invalid webhook signature');
+  return res.status(401).json({ error: 'Invalid signature' });
+}
   }
 
   if (!client.isReady()) {
