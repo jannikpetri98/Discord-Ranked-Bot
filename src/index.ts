@@ -27,11 +27,6 @@ const GOOGLE_PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY ?? '').replace(/\\n/g
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET ?? '';
 const PORT = Number(process.env.PORT) || 3000;
 
-// Express Server starten
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Webhook server running on port ${PORT}`);
-});
-
 const CHANNEL_ARENA = process.env.CHANNEL_ARENA ?? '';
 const CHANNEL_TEAM1_ROT = process.env.CHANNEL_TEAM1_ROT ?? '';
 const CHANNEL_TEAM2_BLAU = process.env.CHANNEL_TEAM2_BLAU ?? '';
@@ -138,9 +133,9 @@ async function postTeamsToDiscord(teams: any[]) {
   }
 }
 
-// Express Server ZUERST starten — läuft unabhängig vom Discord Bot
-app.listen(WEBHOOK_PORT, () => {
-  console.log(`🚀 Webhook server running on port ${WEBHOOK_PORT}`);
+// Express Server starten
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Webhook server running on port ${PORT}`);
 });
 
 // Discord Bot starten (optional — Server läuft auch ohne erfolgreichen Login)
