@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Discord Bot für Ranked Team Management mit Google Sheets Integration",
   "main": "dist/index.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
