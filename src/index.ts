@@ -96,16 +96,61 @@ async function postTeamsToDiscord(teams: any[]) {
         continue;
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle(`Team ${i + 1}`)
-        .setColor(team.color === 'ROT' ? 0xff0000 : 0x0000ff)
-        .addFields(
-          team.members.map((member: any) => ({
-            name: member.name,
-            value: `${member.class} - ${member.role}`,
-            inline: true,
-          }))
-        );
+      let embedColor = 0x808080;
+
+if (team.color === 'ROT') {
+  embedColor = 0xe74c3c;
+}
+
+if (team.color === 'BLAU') {
+  embedColor = 0x3498db;
+}
+
+let playerList = '';
+
+team.members.forEach((member: any, index: number) => {
+
+  const classEmoji =
+    (member.class || '').match(/^[^\s]+/)?.[0] || '❔';
+
+  let rankEmoji = '⭐';
+
+  if (member.rang) {
+    rankEmoji = String(member.rang).trim().split(/\s+/)[0];
+  }
+
+  playerList +=
+    `__**${member.name}**__ ${rankEmoji} ${member.w}\n` +
+    `${classEmoji} ${member.role || '-'}`;
+
+  if (index < team.members.length - 1) {
+    playerList += '\n\n';
+  }
+});
+
+const isReserveTeam =
+  String(team.name).toUpperCase().startsWith('RESERVE');
+
+let embedText = playerList;
+
+if (!isReserveTeam) {
+  embedText +=
+    '\n\n📊 TEAMWERTE\n' +
+    `🛡️ ØT: ${team.avgT ?? '-'}\n` +
+    `🏆 WR: ${team.avgWR ?? '-'}\n` +
+    `⭐ W: ${team.avgW ?? '-'}`;
+}
+
+const embed = new EmbedBuilder()
+  .setTitle(team.name)
+  .setColor(embedColor)
+  .addFields([
+    {
+      name: '\u200B',
+      value: embedText,
+      inline: false,
+    },
+  ]);
 
       await (channel as any).send({ embeds: [embed] });
       console.log(`✅ Team ${i + 1} posted to ${(channel as any).name}`);
