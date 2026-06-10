@@ -132,14 +132,31 @@ function findMemberByName(
 // ---------------------------------------------------------------------------
 // Discord Bot Ready
 // ---------------------------------------------------------------------------
-client.on('ready', () => {
+client.on('ready', async () => {
+
   console.log(`✅ Bot logged in as ${client.user?.tag}`);
-});
 
-client.on('error', (error) => {
-  console.error('❌ Discord client error:', error);
-});
+  try {
 
+    const guild =
+      await client.guilds.fetch(
+        DISCORD_TEST_SERVER_ID
+      );
+
+    await guild.members.fetch();
+
+    console.log(
+      `✅ ${guild.members.cache.size} Mitglieder gecached`
+    );
+
+  } catch (err) {
+
+    console.error(
+      '❌ Fehler beim Initialisieren des Member-Caches',
+      err
+    );
+  }
+});
 // ---------------------------------------------------------------------------
 // Button Interaction Handler: "Alle Teams zuweisen"
 // ---------------------------------------------------------------------------
@@ -168,8 +185,7 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
-    const allMembers = await guild.members.fetch();
-    const memberList = Array.from(allMembers.values());
+    const memberList = Array.from(guild.members.cache.values());
 
     const results: string[] = [];
 
@@ -183,7 +199,7 @@ client.on('interactionCreate', async (interaction) => {
         continue;
       }
 
-      const voiceChannel = await guild.channels.fetch(voiceChannelId);
+      const voiceChannel = guild.channels.cache.get(voiceChannelId);
 
       if (!voiceChannel || !(voiceChannel instanceof VoiceChannel)) {
         results.push(
@@ -266,7 +282,7 @@ client.on('interactionCreate', async (interaction) => {
 // ---------------------------------------------------------------------------
 // Webhook: Teams empfangen und zu Discord posten
 // ---------------------------------------------------------------------------
-app.post('/api/webhook/teams', (req, res) => {
+app.post('/api/webhook/teams', async (req, res) => {
   if (!client.isReady()) {
     console.warn('⚠️ Webhook received but Discord bot is not connected');
     return res.status(503).json({ error: 'Discord bot not connected' });
@@ -278,6 +294,27 @@ app.post('/api/webhook/teams', (req, res) => {
 
   // Teams im Speicher halten, damit Button-Interactions darauf zugreifen können
   latestTeams = teams;
+
+  try {
+
+  const guild =
+    await client.guilds.fetch(
+      DISCORD_TEST_SERVER_ID
+    );
+
+  await guild.members.fetch();
+
+  console.log(
+    `✅ Member-Cache aktualisiert (${guild.members.cache.size})`
+  );
+
+} catch (err) {
+
+  console.error(
+    '❌ Fehler beim Aktualisieren des Member-Caches',
+    err
+  );
+}
 
   postTeamsToDiscord(teams);
 
@@ -312,9 +349,9 @@ app.post('/api/webhook/reset-arena', async (req, res) => {
       );
 
     const arenaChannel =
-      await guild.channels.fetch(
-        CHANNEL_ARENA
-      );
+        guild.channels.cache.get(
+      CHANNEL_ARENA
+    );
 
     if (
       !arenaChannel ||
@@ -326,7 +363,7 @@ app.post('/api/webhook/reset-arena', async (req, res) => {
     }
 
     const allMembers =
-      await guild.members.fetch();
+      guild.members.cache;
 
     let moved = 0;
 
