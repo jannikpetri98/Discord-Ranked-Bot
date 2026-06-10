@@ -84,12 +84,24 @@ async function postTeamsToDiscord(teams: any[]) {
     const channelTeam3 = await guild.channels.fetch(CHANNEL_TEAM3_ROT);
     const channelTeam4 = await guild.channels.fetch(CHANNEL_TEAM4_BLAU);
 
-    const channels = [channelTeam1, channelTeam2, channelTeam3, channelTeam4];
+    const targetChannels = [channelArena,channelTeam1, channelTeam2, channelTeam3, channelTeam4];
 
-    // Teams posten
-    for (let i = 0; i < teams.length; i++) {
-      const team = teams[i];
-      const channel = channels[i];
+for (const channel of targetChannels) {
+
+  if (!channel || !channel.isTextBased()) {
+    continue;
+  }
+
+  for (let i = 0; i < teams.length; i++) {
+
+    const team = teams[i];
+    await (channel as any).send({
+      embeds: [embed]
+    });
+  }
+
+  console.log(`✅ Gesamte Teamliste in ${(channel as any).name} gepostet`);
+}
 
       if (!channel || !channel.isTextBased()) {
         console.warn(`⚠️ Channel ${i + 1} not found or not text-based`);
@@ -160,6 +172,16 @@ const embed = new EmbedBuilder()
   } catch (error) {
     console.error('❌ Error posting teams:', error);
   }
+}
+
+const messages = await channel.messages.fetch({ limit: 100 });
+
+const botMessages = messages.filter(
+  m => m.author.id === client.user?.id
+);
+
+for (const [, message] of botMessages) {
+  await message.delete().catch(() => {});
 }
 
 // Express Server starten
