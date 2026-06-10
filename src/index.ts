@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 import { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import express from 'express';
 import { google } from 'googleapis';
-import crypto from 'crypto';
 
 dotenv.config();
 
@@ -24,7 +23,6 @@ const DISCORD_TEST_SERVER_ID = process.env.DISCORD_TEST_SERVER_ID ?? '';
 const GOOGLE_SHEETS_ID = process.env.GOOGLE_SHEETS_ID ?? '';
 const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? '';
 const GOOGLE_PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n');
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET ?? '';
 const PORT = Number(process.env.PORT) || 3000;
 
 const CHANNEL_ARENA = process.env.CHANNEL_ARENA ?? '';
@@ -36,7 +34,6 @@ const CHANNEL_TEAM4_BLAU = process.env.CHANNEL_TEAM4_BLAU ?? '';
 // Fehlende kritische Variablen loggen (kein Crash)
 if (!DISCORD_TOKEN) console.warn('⚠️  DISCORD_TOKEN is not set — Discord bot will not connect');
 if (!GOOGLE_PRIVATE_KEY) console.warn('⚠️  GOOGLE_PRIVATE_KEY is not set — Google Sheets integration disabled');
-if (!WEBHOOK_SECRET) console.warn('⚠️  WEBHOOK_SECRET is not set — webhook signature validation will reject all requests');
 
 // Discord Bot Ready
 client.on('ready', () => {
@@ -47,39 +44,16 @@ client.on('error', (error) => {
   console.error('❌ Discord client error:', error);
 });
 
-// Webhook Endpoint
 app.post('/api/webhook/teams', (req, res) => {
-  // Webhook Secret validieren
-  if (!WEBHOOK_SECRET) {
-    console.error('❌ WEBHOOK_SECRET is not configured');
-    return res.status(503).json({ error: 'Webhook secret not configured' });
-  }
-
-  const signature = req.headers['x-webhook-signature'] as string;
-  const body = JSON.stringify(req.body);
-  const hash = crypto
-    .createHmac('sha256', WEBHOOK_SECRET)
-    .update(body)
-    .digest('hex');
-
-  // DEBUG
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('Received Signature :', signature);
-  console.log('Calculated Signature:', hash);
-  console.log('Body:', body);
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-  if (signature !== hash) {
-    console.warn('❌ Invalid webhook signature');
-    return res.status(401).json({ error: 'Invalid signature' });
-  }
-
   if (!client.isReady()) {
-    console.warn('⚠️  Webhook received but Discord bot is not connected');
+    console.warn('⚠️ Webhook received but Discord bot is not connected');
     return res.status(503).json({ error: 'Discord bot not connected' });
   }
 
-  const teams = req.body.teams;
+  const teams = req.body.teams || [];
+
+  console.log(`📨 Received ${teams.length} teams from Google Sheets`);
+
   postTeamsToDiscord(teams);
 
   res.json({ success: true });
@@ -91,9 +65,8 @@ app.get('/health', (req, res) => {
     status: 'ok',
     bot: client.isReady(),
     config: {
-      discordToken: !!DISCORD_TOKEN,
-      googlePrivateKey: !!GOOGLE_PRIVATE_KEY,
-      webhookSecret: !!WEBHOOK_SECRET,
+  discordToken: !!DISCORD_TOKEN,
+  googlePrivateKey: !!GOOGLE_PRIVATE_KEY,
     },
   });
 });
