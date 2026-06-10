@@ -392,14 +392,21 @@ async function postTeamsToDiscord(teams: any[]) {
 
      const assignButton = new ButtonBuilder()
     .setCustomId('assign_all_teams')
-    .setLabel(' Alle Spieler bereit? 🎮 Alle Teams zuweisen! ')
+    .setLabel('🎮 Alle Teams zuweisen')
     .setStyle(ButtonStyle.Success);
 
     const row =
     new ActionRowBuilder<ButtonBuilder>()
       .addComponents(assignButton);
 
+    await channel.send({
+    content:
+      'Sind alle Spieler bereit? Dann Teamzuweisung starten:',
+    components: [row],
+    });
+      }
     
+
       console.log(`✅ Gesamte Teamliste in ${channel.name} gepostet`);
     }
   
