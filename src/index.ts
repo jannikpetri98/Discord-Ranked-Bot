@@ -406,31 +406,9 @@ async function postTeamsToDiscord(teams: any[]) {
     });
       }
     
-    await channel.send({
-    embeds: [embed],
-    });
 
       console.log(`✅ Gesamte Teamliste in ${channel.name} gepostet`);
     }
-
-    // Nur im Arena-Channel EINEN globalen Button anzeigen
-if (channel.id === CHANNEL_ARENA) {
-
-  const assignButton = new ButtonBuilder()
-    .setCustomId('assign_all_teams')
-    .setLabel('🎮 Alle Teams zuweisen')
-    .setStyle(ButtonStyle.Success);
-
-  const row =
-    new ActionRowBuilder<ButtonBuilder>()
-      .addComponents(assignButton);
-
-  await channel.send({
-    content:
-      'Sind alle Spieler bereit? Dann Teamzuweisung starten:',
-    components: [row],
-  });
-}
   
     console.log('✅ All teams posted to Discord');
   } catch (error) {
