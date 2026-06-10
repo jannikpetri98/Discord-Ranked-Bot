@@ -84,104 +84,103 @@ async function postTeamsToDiscord(teams: any[]) {
     const channelTeam3 = await guild.channels.fetch(CHANNEL_TEAM3_ROT);
     const channelTeam4 = await guild.channels.fetch(CHANNEL_TEAM4_BLAU);
 
-    const targetChannels = [channelArena,channelTeam1, channelTeam2, channelTeam3, channelTeam4];
+    const targetChannels = [channelArena, channelTeam1, channelTeam2, channelTeam3, channelTeam4];
 
-for (const channel of targetChannels) {
-
-  if (!channel || !channel.isTextBased()) {
-    continue;
-  }
-
-  for (let i = 0; i < teams.length; i++) {
-
-    const team = teams[i];
-    await (channel as any).send({
-      embeds: [embed]
-    });
-  }
-
-  console.log(`✅ Gesamte Teamliste in ${(channel as any).name} gepostet`);
-}
+    for (const channel of targetChannels) {
 
       if (!channel || !channel.isTextBased()) {
-        console.warn(`⚠️ Channel ${i + 1} not found or not text-based`);
         continue;
       }
 
-      let embedColor = 0x808080;
+      // Alte Bot-Nachrichten löschen
+      try {
+        const messages = await channel.messages.fetch({ limit: 100 });
 
-if (team.color === 'ROT') {
-  embedColor = 0xe74c3c;
-}
+        const botMessages = messages.filter(
+          m => m.author.id === client.user?.id
+        );
 
-if (team.color === 'BLAU') {
-  embedColor = 0x3498db;
-}
+        for (const [, message] of botMessages) {
+          await message.delete().catch(() => {});
+        }
+      } catch (err) {
+        console.warn(`⚠️ Konnte alte Nachrichten in ${channel.name} nicht löschen`);
+      }
 
-let playerList = '';
+      // Alle Teams in diesen Channel posten
+      for (let i = 0; i < teams.length; i++) {
 
-team.members.forEach((member: any, index: number) => {
+        const team = teams[i];
 
-  const classEmoji =
-    (member.class || '').match(/^[^\s]+/)?.[0] || '❔';
+        let embedColor = 0x808080;
 
-  let rankEmoji = '⭐';
+        if (team.color === 'ROT') {
+          embedColor = 0xe74c3c;
+        }
 
-  if (member.rang) {
-    rankEmoji = String(member.rang).trim().split(/\s+/)[0];
-  }
+        if (team.color === 'BLAU') {
+          embedColor = 0x3498db;
+        }
 
-  playerList +=
-    `__**${member.name}**__ ${rankEmoji} ${member.w}\n` +
-    `${classEmoji} ${member.role || '-'}`;
+        let playerList = '';
 
-  if (index < team.members.length - 1) {
-    playerList += '\n\n';
-  }
-});
+        team.members.forEach((member: any, index: number) => {
 
-const isReserveTeam =
-  String(team.name).toUpperCase().startsWith('RESERVE');
+          const classEmoji =
+            (member.class || '').match(/^[^\s]+/)?.[0] || '❔';
 
-let embedText = playerList;
+          let rankEmoji = '⭐';
 
-if (!isReserveTeam) {
-  embedText +=
-    '\n\n📊 TEAMWERTE\n' +
-    `🛡️ ØT: ${team.avgT ?? '-'}\n` +
-    `🏆 WR: ${team.avgWR ?? '-'}\n` +
-    `⭐ W: ${team.avgW ?? '-'}`;
-}
+          if (member.rang) {
+            rankEmoji = String(member.rang).trim().split(/\s+/)[0];
+          }
 
-const embed = new EmbedBuilder()
-  .setTitle(team.name)
-  .setColor(embedColor)
-  .addFields([
-    {
-      name: '\u200B',
-      value: embedText,
-      inline: false,
-    },
-  ]);
+          playerList +=
+            `__**${member.name}**__ ${rankEmoji} ${member.w}\n` +
+            `${classEmoji} ${member.role || '-'}`;
 
-      await (channel as any).send({ embeds: [embed] });
-      console.log(`✅ Team ${i + 1} posted to ${(channel as any).name}`);
+          if (index < team.members.length - 1) {
+            playerList += '\n\n';
+          }
+        });
+
+        const isReserveTeam =
+          String(team.name).toUpperCase().startsWith('RESERVE');
+
+        let embedText = playerList;
+
+        if (!isReserveTeam) {
+          embedText +=
+            '\n\n📊 TEAMWERTE\n' +
+            `🛡️ ØT: ${team.avgT ?? '-'}\n` +
+            `🏆 WR: ${team.avgWR ?? '-'}\n` +
+            `⭐ W: ${team.avgW ?? '-'}`;
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle(team.name)
+          .setColor(embedColor)
+          .addFields([
+            {
+              name: '\u200B',
+              value: embedText,
+              inline: false,
+            },
+          ]);
+
+        await channel.send({
+          embeds: [embed]
+        });
+      }
+
+      console.log(`✅ Gesamte Teamliste in ${channel.name} gepostet`);
     }
 
     console.log('✅ All teams posted to Discord');
+
   } catch (error) {
     console.error('❌ Error posting teams:', error);
   }
-}
-
-const messages = await channel.messages.fetch({ limit: 100 });
-
-const botMessages = messages.filter(
-  m => m.author.id === client.user?.id
-);
-
-for (const [, message] of botMessages) {
-  await message.delete().catch(() => {});
 }
 
 // Express Server starten
