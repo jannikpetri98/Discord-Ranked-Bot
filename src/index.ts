@@ -338,7 +338,7 @@ async function checkRankedEvents() {
       }
 
       const startTime =
-        event.scheduledStartTimestamp;
+        event.scheduledStartTimestamp!;
 
       const now = Date.now();
 
