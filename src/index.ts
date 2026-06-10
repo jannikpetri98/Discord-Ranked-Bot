@@ -313,108 +313,73 @@ async function postTeamsToDiscord(teams: any[]) {
 
     const targetChannels = [channelArena, channelTeam1, channelTeam2, channelTeam3, channelTeam4];
 
-    for (const channel of targetChannels) {
-      if (!channel || !channel.isTextBased()) {
-        continue;
-      }
+  for (const channel of targetChannels) {
 
-      // Alte Bot-Nachrichten löschen
-      try {
-        const messages = await channel.messages.fetch({ limit: 100 });
-        const botMessages = messages.filter(
-          (m) => m.author.id === client.user?.id,
-        );
-        for (const [, message] of botMessages) {
-          await message.delete().catch(() => {});
-        }
-      } catch (err) {
-        console.warn(`⚠️ Konnte alte Nachrichten in ${channel.name} nicht löschen`);
-      }
+  if (!channel || !channel.isTextBased()) {
+    continue;
+  }
 
-      // Alle Teams in diesen Channel posten
-      for (let i = 0; i < teams.length; i++) {
-        const team = teams[i];
+  const textChannel = channel as any;
 
-        let embedColor = 0x808080;
-        if (team.color === 'ROT') embedColor = 0xe74c3c;
-        if (team.color === 'BLAU') embedColor = 0x3498db;
+  // Alte Bot-Nachrichten löschen
+  try {
 
-        let playerList = '';
+    const messages =
+      await textChannel.messages.fetch({ limit: 100 });
 
-        team.members.forEach((member: any, index: number) => {
-          const classEmoji =
-            (member.class || '').match(/^[^\s]+/)?.[0] || '❔';
+    const botMessages = messages.filter(
+      (m: any) => m.author.id === client.user?.id
+    );
 
-          let rankEmoji = '⭐';
-          if (member.rang) {
-            rankEmoji = String(member.rang).trim().split(/\s+/)[0];
-          }
-
-          playerList +=
-            `__**${member.name}**__ ${rankEmoji} ${member.w}\n` +
-            `${classEmoji} ${member.role || '-'}`;
-
-          if (index < team.members.length - 1) {
-            playerList += '\n\n';
-          }
-        });
-
-        const isReserveTeam =
-          String(team.name).toUpperCase().startsWith('RESERVE');
-
-        let embedText = playerList;
-
-        if (!isReserveTeam) {
-          embedText +=
-            '\n\n📊 TEAMWERTE\n' +
-            `🛡️ ØT: ${team.avgT ?? '-'}\n` +
-            `🏆 WR: ${team.avgWR ?? '-'}\n` +
-            `⭐ W: ${team.avgW ?? '-'}`;
-        }
-
-        const embed = new EmbedBuilder()
-          .setTitle(team.name)
-          .setColor(embedColor)
-          .addFields([
-            {
-              name: '\u200B',
-              value: embedText,
-              inline: false,
-            },
-          ]);
-
-    await channel.send({
-    embeds: [embed],
-    });
-
-      console.log(`✅ Gesamte Teamliste in ${channel.name} gepostet`);
+    for (const [, message] of botMessages) {
+      await message.delete().catch(() => {});
     }
 
-    // Nur im Arena-Channel EINEN globalen Button anzeigen
-if (channel.id === CHANNEL_ARENA) {
+  } catch (err) {
 
-  const assignButton = new ButtonBuilder()
-    .setCustomId('assign_all_teams')
-    .setLabel('🎮 Alle Teams zuweisen')
-    .setStyle(ButtonStyle.Success);
-
-  const row =
-    new ActionRowBuilder<ButtonBuilder>()
-      .addComponents(assignButton);
-
-  await channel.send({
-    content:
-      'Sind alle Spieler bereit? Dann Teamzuweisung starten:',
-    components: [row],
-  });
-}
-  
-    console.log('✅ All teams posted to Discord');
-  } catch (error) {
-    console.error('❌ Error posting teams:', error);
+    console.warn(
+      `⚠️ Konnte alte Nachrichten in ${textChannel.name} nicht löschen`
+    );
   }
-}
 
+  // Alle Teams posten
+  for (let i = 0; i < teams.length; i++) {
+
+    const team = teams[i];
+
+    // Embed bauen
+    ...
+    ...
+
+    await textChannel.send({
+      embeds: [embed],
+    });
+  }
+
+  // Arena-Button NACH allen Teams posten
+  if (textChannel.id === CHANNEL_ARENA) {
+
+    const assignButton = new ButtonBuilder()
+      .setCustomId('assign_all_teams')
+      .setLabel('🎮 Alle Teams zuweisen')
+      .setStyle(ButtonStyle.Success);
+
+    const row =
+      new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(assignButton);
+
+    await textChannel.send({
+      content:
+        'Sind alle Spieler bereit? Dann Teamzuweisung starten:',
+      components: [row],
+    });
+  }
+
+  console.log(
+    `✅ Gesamte Teamliste in ${textChannel.name} gepostet`
+  );
+}
+    
 // ---------------------------------------------------------------------------
 // Express Server starten
 // ---------------------------------------------------------------------------
