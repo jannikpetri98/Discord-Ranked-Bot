@@ -43,12 +43,7 @@ const CHANNEL_TEAM3_ROT = process.env.CHANNEL_TEAM3_ROT ?? '';
 const CHANNEL_TEAM4_BLAU = process.env.CHANNEL_TEAM4_BLAU ?? '';
 
 // Voice-Channel-Mapping: Team-Index (0-basiert) → Voice-Channel-ID
-const TEAM_VOICE_CHANNELS: Record<number, string> = {
-  0: CHANNEL_TEAM1_ROT,
-  1: CHANNEL_TEAM2_BLAU,
-  2: CHANNEL_TEAM3_ROT,
-  3: CHANNEL_TEAM4_BLAU,
-};
+const TEAM_VOICE_CHANNELS: Record<number, string> = {0: CHANNEL_TEAM1_ROT, 1: CHANNEL_TEAM2_BLAU, 2: CHANNEL_TEAM3_ROT, 3: CHANNEL_TEAM4_BLAU,};
 
 // Fehlende kritische Variablen loggen (kein Crash)
 if (!DISCORD_TOKEN) console.warn('⚠️  DISCORD_TOKEN is not set — Discord bot will not connect');
@@ -146,35 +141,14 @@ client.on('error', (error) => {
 });
 
 // ---------------------------------------------------------------------------
-// Button Interaction Handler: "Alle bereit? Teams zuweisen!"
+// Button Interaction Handler: "Alle Teams zuweisen"
 // ---------------------------------------------------------------------------
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isButton()) return;
 
   const buttonInteraction = interaction as ButtonInteraction;
-  const { customId } = buttonInteraction;
 
-  // Nur assign_team_* Buttons verarbeiten
-  if (!customId.startsWith('assign_team_')) return;
-
-  const teamIndex = parseInt(customId.replace('assign_team_', ''), 10);
-
-  if (isNaN(teamIndex) || teamIndex < 0 || teamIndex >= latestTeams.length) {
-    await buttonInteraction.reply({
-      content: '❌ Team-Daten nicht gefunden. Bitte Webhook erneut auslösen.',
-      ephemeral: true,
-    });
-    return;
-  }
-
-  const team = latestTeams[teamIndex];
-  const voiceChannelId = TEAM_VOICE_CHANNELS[teamIndex];
-
-  if (!voiceChannelId) {
-    await buttonInteraction.reply({
-      content: `❌ Kein Voice-Channel für Team ${teamIndex + 1} konfiguriert.`,
-      ephemeral: true,
-    });
+  if (buttonInteraction.customId !== 'assign_all_teams') {
     return;
   }
 
@@ -182,70 +156,109 @@ client.on('interactionCreate', async (interaction) => {
 
   try {
     const guild = buttonInteraction.guild;
-    if (!guild) throw new Error('Guild nicht verfügbar');
 
-    // Voice-Channel holen
-    const voiceChannel = await guild.channels.fetch(voiceChannelId);
-    if (!voiceChannel || !(voiceChannel instanceof VoiceChannel)) {
+    if (!guild) {
+      throw new Error('Guild nicht verfügbar');
+    }
+
+    if (!latestTeams.length) {
       await buttonInteraction.editReply({
-        content: `❌ Voice-Channel für Team ${teamIndex + 1} nicht gefunden oder kein Voice-Channel.`,
+        content: '❌ Keine Teamdaten vorhanden. Bitte zuerst Teams erstellen.',
       });
       return;
     }
 
-    // Alle Guild-Members laden (gecacht + frisch)
     const allMembers = await guild.members.fetch();
     const memberList = Array.from(allMembers.values());
 
     const results: string[] = [];
 
-    for (const teamMember of team.members as any[]) {
-      const sheetsName: string = teamMember.name ?? '';
+    for (let teamIndex = 0; teamIndex < latestTeams.length; teamIndex++) {
 
-      if (!sheetsName) {
-        results.push(`⚠️ Leerer Name übersprungen`);
+      const team = latestTeams[teamIndex];
+
+      const voiceChannelId = TEAM_VOICE_CHANNELS[teamIndex];
+
+      if (!voiceChannelId) {
         continue;
       }
 
-      const discordMember = findMemberByName(memberList, sheetsName);
+      const voiceChannel = await guild.channels.fetch(voiceChannelId);
 
-      if (!discordMember) {
-        console.warn(`⚠️ Member nicht gefunden: "${sheetsName}"`);
-        results.push(`⚠️ Nicht gefunden: **${sheetsName}**`);
-        continue;
-      }
-
-      // Prüfen ob Member in einem Voice-Channel ist
-      if (!discordMember.voice.channelId) {
-        console.log(`ℹ️ ${discordMember.displayName} ist in keinem Voice-Channel — übersprungen`);
-        results.push(`ℹ️ Nicht im Voice: **${discordMember.displayName}** (${sheetsName})`);
-        continue;
-      }
-
-      // In Ziel-Voice-Channel verschieben
-      try {
-        await discordMember.voice.setChannel(voiceChannel);
-        console.log(
-          `✅ ${discordMember.displayName} → ${voiceChannel.name} (Team ${teamIndex + 1})`,
+      if (!voiceChannel || !(voiceChannel instanceof VoiceChannel)) {
+        results.push(
+          `❌ Voice-Channel für ${team.name} nicht gefunden`
         );
-        results.push(`✅ Verschoben: **${discordMember.displayName}** → ${voiceChannel.name}`);
-      } catch (moveErr) {
-        console.error(
-          `❌ Konnte ${discordMember.displayName} nicht verschieben:`,
-          moveErr,
+        continue;
+      }
+
+      for (const teamMember of team.members as any[]) {
+
+        const sheetsName = teamMember.name ?? '';
+
+        if (!sheetsName) {
+          continue;
+        }
+
+        const discordMember = findMemberByName(
+          memberList,
+          sheetsName
         );
-        results.push(`❌ Fehler beim Verschieben: **${discordMember.displayName}**`);
+
+        if (!discordMember) {
+          results.push(
+            `⚠️ Nicht gefunden: ${sheetsName}`
+          );
+          continue;
+        }
+
+        if (!discordMember.voice.channelId) {
+          results.push(
+            `ℹ️ Nicht im Voice: ${discordMember.displayName}`
+          );
+          continue;
+        }
+
+        try {
+
+          await discordMember.voice.setChannel(
+            voiceChannel
+          );
+
+          results.push(
+            `✅ ${discordMember.displayName} → ${voiceChannel.name}`
+          );
+
+        } catch (moveErr) {
+
+          console.error(
+            `❌ Fehler beim Verschieben von ${discordMember.displayName}`,
+            moveErr
+          );
+
+          results.push(
+            `❌ Fehler: ${discordMember.displayName}`
+          );
+        }
       }
     }
 
-    const summary = results.join('\n') || 'Keine Members verarbeitet.';
     await buttonInteraction.editReply({
-      content: `**${team.name} — Zuweisung abgeschlossen**\n\n${summary}`,
+      content:
+        `🎮 Teamzuweisung abgeschlossen\n\n` +
+        results.join('\n'),
     });
+
   } catch (error) {
-    console.error('❌ Fehler beim Zuweisen der Teams:', error);
+
+    console.error(
+      '❌ Fehler beim Zuweisen der Teams:',
+      error
+    );
+
     await buttonInteraction.editReply({
-      content: '❌ Interner Fehler beim Zuweisen. Bitte Logs prüfen.',
+      content:
+        '❌ Interner Fehler beim Zuweisen. Bitte Logs prüfen.',
     });
   }
 });
