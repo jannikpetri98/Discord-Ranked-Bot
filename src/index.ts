@@ -387,34 +387,35 @@ client.on('ready', async () => {
       `✅ ${guild.members.cache.size} Mitglieder gecached`
     );
 
+    const events =
+      await guild.scheduledEvents.fetch();
+
+    for (const [, event] of events) {
+
+      if (
+        isRankedEvent(
+          event.name
+        )
+      ) {
+        await scheduleEvent(
+          event.id
+        );
+      }
+    }
+
+    console.log(
+      '✅ Ranked Event Scheduler initialisiert'
+    );
+
   } catch (err) {
 
     console.error(
-      '❌ Fehler beim Initialisieren des Member-Caches',
+      '❌ Fehler beim Initialisieren',
       err
     );
   }
- const events =
-  await guild.scheduledEvents.fetch();
-
-for (const [, event] of events) {
-
-  if (
-    isRankedEvent(
-      event.name
-    )
-  ) {
-
-    await scheduleEvent(
-      event.id
-    );
-  }
-}
-
-console.log(
-  '✅ Ranked Event Scheduler initialisiert'
-);
 });
+
 // ---------------------------------------------------------------------------
 // Discord Event Listener
 // ---------------------------------------------------------------------------
