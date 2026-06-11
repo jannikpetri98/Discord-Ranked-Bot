@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
-import {
-  Client,
+import {Client,
   GatewayIntentBits,
+  Partials,
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
@@ -26,6 +26,9 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.DirectMessages,
   ],
+  partials: [
+    Partials.GuildScheduledEvent
+  ],
 });
 
 // Umgebungsvariablen — Fallbacks verhindern Crashes bei fehlenden Werten
@@ -41,8 +44,6 @@ const CHANNEL_TEAM1_ROT = process.env.CHANNEL_TEAM1_ROT ?? '';
 const CHANNEL_TEAM2_BLAU = process.env.CHANNEL_TEAM2_BLAU ?? '';
 const CHANNEL_TEAM3_ROT = process.env.CHANNEL_TEAM3_ROT ?? '';
 const CHANNEL_TEAM4_BLAU = process.env.CHANNEL_TEAM4_BLAU ?? '';
-const RANKED_EVENT_ID = process.env.RANKED_EVENT_ID ?? '';
-const RANKED_EVENT_ID_2 = process.env.RANKED_EVENT_ID_2 ?? '';
 const RANKED_EVENT_CHANNEL = process.env.RANKED_EVENT_CHANNEL ?? '';
 
 
@@ -57,17 +58,10 @@ if (!GOOGLE_PRIVATE_KEY) console.warn('⚠️  GOOGLE_PRIVATE_KEY is not set —
 // In-Memory Store: zuletzt empfangene Teams für Button-Interactions
 // ---------------------------------------------------------------------------
 let latestTeams: any[] = [];
-const RANKED_EVENT_IDS = [
-  RANKED_EVENT_ID,
-  RANKED_EVENT_ID_2,
-].filter(Boolean);
 
-const reminderState = new Map<
+const activeEventTimeouts = new Map<
   string,
-  {
-    sent6h: boolean;
-    sent30m: boolean;
-  }
+  NodeJS.Timeout[]
 >();
 
 // ---------------------------------------------------------------------------
@@ -98,6 +92,19 @@ function decodeMathBold(input: string): string {
     }
   }
   return result;
+}
+
+function isRankedEvent(
+  eventName: string
+): boolean {
+
+  return decodeMathBold(
+    eventName
+  )
+    .toUpperCase()
+    .includes(
+      'GILDEN RANKED'
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +152,221 @@ function findMemberByName(
   return null;
 }
 
+function clearEventTimeouts(
+  eventId: string
+) {
+
+  const handles =
+    activeEventTimeouts.get(
+      eventId
+    );
+
+  if (!handles) {
+    return;
+  }
+
+  for (const handle of handles) {
+    clearTimeout(handle);
+  }
+
+  activeEventTimeouts.delete(
+    eventId
+  );
+
+  console.log(
+    `🗑️ Event-Timer gelöscht: ${eventId}`
+  );
+}
+
+async function sendEventReminder(
+  eventId: string,
+  type: '6h' | '30m'
+) {
+
+  try {
+
+    const guild =
+      await client.guilds.fetch(
+        DISCORD_TEST_SERVER_ID
+      );
+
+    const event =
+      await guild.scheduledEvents.fetch(
+        eventId
+      );
+
+    if (!event) {
+      return;
+    }
+
+    const reminderChannel =
+      guild.channels.cache.get(
+        RANKED_EVENT_CHANNEL
+      );
+
+    if (
+      !reminderChannel ||
+      !reminderChannel.isTextBased()
+    ) {
+      return;
+    }
+
+    const interested =
+      event.userCount ?? 0;
+
+    if (type === '6h') {
+
+      await reminderChannel.send({
+
+content:
+`@everyone
+
+⚔️ In 6 Stunden beginnt unser Gilden Ranked!
+
+Heute zählt jeder Sieg, jede Entscheidung und jedes Teamplay.
+
+🏆 Zeigt was ihr könnt und kämpft für die Spitze der Rangliste!`
+      });
+
+      console.log(
+        `✅ 6h Reminder gesendet: ${event.name}`
+      );
+
+      return;
+    }
+
+    let message = '';
+
+    if (interested < 10) {
+
+      message =
+`@everyone
+
+⚠️ Aktuell haben erst ${interested} Spieler Interesse am heutigen Ranked angemeldet.
+
+Wir benötigen noch weitere Teilnehmer damit das Event stattfinden kann.
+
+🚨 Noch 30 Minuten bis zum Start!
+
+Jeder einzelne Spieler macht den Unterschied!`;
+    }
+
+    else {
+
+      message =
+`👥 Aktuell haben bereits ${interested} Spieler Interesse am heutigen Ranked angemeldet.
+
+🚨 Noch 30 Minuten bis zum Start!
+
+Die Arena wartet bereits auf euch. Macht euch bereit für spannende Matches und wichtige Ranglistenpunkte!`;
+    }
+
+    await reminderChannel.send({
+      content: message
+    });
+
+    console.log(
+      `✅ 30min Reminder gesendet: ${event.name}`
+    );
+
+  } catch (err) {
+
+    console.error(
+      '❌ Reminder Fehler',
+      err
+    );
+  }
+}
+
+async function scheduleEvent(
+  eventId: string
+) {
+
+  try {
+
+    const guild =
+      await client.guilds.fetch(
+        DISCORD_TEST_SERVER_ID
+      );
+
+    const event =
+      await guild.scheduledEvents.fetch(
+        eventId
+      );
+
+    if (
+      !event ||
+      !event.scheduledStartTimestamp
+    ) {
+      return;
+    }
+
+    clearEventTimeouts(eventId);
+
+    const startTime =
+      event.scheduledStartTimestamp;
+
+    const now =
+      Date.now();
+
+    const timeout6h =
+      startTime -
+      (6 * 60 * 60 * 1000) -
+      now;
+
+    const timeout30m =
+      startTime -
+      (30 * 60 * 1000) -
+      now;
+
+    const handles: NodeJS.Timeout[] = [];
+
+    if (timeout6h > 0) {
+
+      handles.push(
+        setTimeout(
+          () =>
+            void sendEventReminder(
+              eventId,
+              '6h'
+            ),
+          timeout6h
+        )
+      );
+    }
+
+    if (timeout30m > 0) {
+
+      handles.push(
+        setTimeout(
+          () =>
+            void sendEventReminder(
+              eventId,
+              '30m'
+            ),
+          timeout30m
+        )
+      );
+    }
+
+    activeEventTimeouts.set(
+      eventId,
+      handles
+    );
+
+    console.log(
+      `📅 Event geplant: ${event.name}`
+    );
+
+  } catch (err) {
+
+    console.error(
+      '❌ Event Scheduling Fehler',
+      err
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Discord Bot Ready
 // ---------------------------------------------------------------------------
@@ -172,15 +394,88 @@ client.on('ready', async () => {
       err
     );
   }
-  setInterval(
-  checkRankedEvents,
-  5 * 60 * 1000
-);
+ const events =
+  await guild.scheduledEvents.fetch();
+
+for (const [, event] of events) {
+
+  if (
+    isRankedEvent(
+      event.name
+    )
+  ) {
+
+    await scheduleEvent(
+      event.id
+    );
+  }
+}
 
 console.log(
-  '✅ Ranked Event Scheduler gestartet'
+  '✅ Ranked Event Scheduler initialisiert'
 );
 });
+// ---------------------------------------------------------------------------
+// Discord Event Listener
+// ---------------------------------------------------------------------------
+client.on(
+  'guildScheduledEventCreate',
+  async (event) => {
+
+    if (
+      !isRankedEvent(
+        event.name
+      )
+    ) {
+      return;
+    }
+
+    await scheduleEvent(
+      event.id
+    );
+
+    console.log(
+      `🆕 Ranked Event erkannt: ${event.name}`
+    );
+  }
+);
+client.on(
+  'guildScheduledEventUpdate',
+  async (
+    _oldEvent,
+    newEvent
+  ) => {
+
+    if (
+      !isRankedEvent(
+        newEvent.name
+      )
+    ) {
+      return;
+    }
+
+    await scheduleEvent(
+      newEvent.id
+    );
+
+    console.log(
+      `🔄 Ranked Event aktualisiert: ${newEvent.name}`
+    );
+  }
+);
+client.on(
+  'guildScheduledEventDelete',
+  async (event) => {
+
+    clearEventTimeouts(
+      event.id
+    );
+
+    console.log(
+      `🗑️ Ranked Event gelöscht: ${event.name}`
+    );
+  }
+);
 // ---------------------------------------------------------------------------
 // Button Interaction Handler: "Alle Teams zuweisen"
 // ---------------------------------------------------------------------------
@@ -302,153 +597,6 @@ client.on('interactionCreate', async (interaction) => {
     });
   }
 });
-// ---------------------------------------------------------------------------
-// Ranked Event Reminder
-// ---------------------------------------------------------------------------
-async function checkRankedEvents() {
-
-  try {
-
-    const guild =
-      await client.guilds.fetch(
-        DISCORD_TEST_SERVER_ID
-      );
-
-    const reminderChannel =
-      guild.channels.cache.get(
-        RANKED_EVENT_CHANNEL
-      );
-
-    if (
-      !reminderChannel ||
-      !reminderChannel.isTextBased()
-    ) {
-      return;
-    }
-
-    for (const eventId of RANKED_EVENT_IDS) {
-
-      const event =
-        await guild.scheduledEvents.fetch(
-          eventId
-        );
-
-      if (!event) {
-        continue;
-      }
-
-      const startTime =
-        event.scheduledStartTimestamp!;
-
-      const now = Date.now();
-
-      const diffMinutes =
-        Math.floor(
-          (startTime - now) / 60000
-        );
-
-      if (!reminderState.has(eventId)) {
-
-        reminderState.set(
-          eventId,
-          {
-            sent6h: false,
-            sent30m: false,
-          }
-        );
-      }
-
-      const state =
-        reminderState.get(eventId)!;
-
-      if (
-  diffMinutes <= 360 &&
-  diffMinutes > 355 &&
-  !state.sent6h
-) {
-
-  state.sent6h = true;
-
-  const description =
-    event.description
-      ?.substring(0, 300)
-      ?? '';
-
-  await reminderChannel.send({
-
-    content:
-`@everyone
-
-⚔️ In 6 Stunden beginnt unser Gilden Ranked!
-
-Heute zählt jeder Sieg, jede Entscheidung und jedes Teamplay.
-
-${description}
-
-🏆 Zeigt was ihr könnt und kämpft für die Spitze der Rangliste!`
-  });
-
-  console.log(
-    `✅ 6h Reminder gesendet: ${event.name}`
-  );
-}
-
-      if (
-  diffMinutes <= 30 &&
-  diffMinutes > 25 &&
-  !state.sent30m
-) {
-
-  state.sent30m = true;
-
-  const interested =
-    event.userCount ?? 0;
-
-  let message = '';
-
-  if (interested < 10) {
-
-    message =
-`@everyone
-
-⚠️ Aktuell haben erst ${interested} Spieler Interesse am heutigen Ranked angemeldet.
-
-Wir benötigen noch weitere Teilnehmer damit das Event stattfinden kann.
-
-🚨 Noch 30 Minuten bis zum Start!
-
-Jeder einzelne Spieler macht den Unterschied!`;
-  }
-
-  else {
-
-    message =
-`👥 Aktuell haben bereits ${interested} Spieler Interesse am heutigen Ranked angemeldet.
-
-🚨 Noch 30 Minuten bis zum Start!
-
-Die Arena wartet bereits auf euch. Macht euch bereit für spannende Matches und wichtige Ranglistenpunkte!`;
-  }
-
-  await reminderChannel.send({
-    content: message
-  });
-
-  console.log(
-    `✅ 30min Reminder gesendet: ${event.name}`
-  );
-}
-
-    }
-
-  } catch (err) {
-
-    console.error(
-      '❌ Event Reminder Fehler',
-      err
-    );
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Webhook: Teams empfangen und zu Discord posten
