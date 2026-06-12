@@ -25,9 +25,10 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildScheduledEvents,
   ],
   partials: [
-    Partials.GuildScheduledEvent
+    Partials.GuildScheduledEvent,
   ],
 });
 
@@ -390,15 +391,30 @@ client.on('ready', async () => {
     const events =
       await guild.scheduledEvents.fetch();
 
+    console.log(
+      `📋 ${events.size} Guild Scheduled Event(s) gefunden`
+    );
+
     for (const [, event] of events) {
+
+      console.log(
+        `🔍 Prüfe Event: "${event.name}" (ID: ${event.id})`
+      );
 
       if (
         isRankedEvent(
           event.name
         )
       ) {
+        console.log(
+          `✅ Ranked Event erkannt beim Start: "${event.name}"`
+        );
         await scheduleEvent(
           event.id
+        );
+      } else {
+        console.log(
+          `⏭️ Kein Ranked Event, übersprungen: "${event.name}"`
         );
       }
     }
@@ -423,23 +439,41 @@ client.on(
   'guildScheduledEventCreate',
   async (event) => {
 
-    if (
-      !isRankedEvent(
-        event.name
-      )
-    ) {
-      return;
-    }
-
-    await scheduleEvent(
-      event.id
-    );
-
     console.log(
-      `🆕 Ranked Event erkannt: ${event.name}`
+      `📥 guildScheduledEventCreate ausgelöst: "${event.name}" (ID: ${event.id})`
     );
+
+    try {
+
+      if (
+        !isRankedEvent(
+          event.name
+        )
+      ) {
+        console.log(
+          `⏭️ Kein Ranked Event, ignoriert: "${event.name}"`
+        );
+        return;
+      }
+
+      console.log(
+        `🆕 Ranked Event erkannt: "${event.name}"`
+      );
+
+      await scheduleEvent(
+        event.id
+      );
+
+    } catch (err) {
+
+      console.error(
+        `❌ Fehler in guildScheduledEventCreate (Event: "${event.name}", ID: ${event.id}):`,
+        err
+      );
+    }
   }
 );
+
 client.on(
   'guildScheduledEventUpdate',
   async (
@@ -447,34 +481,71 @@ client.on(
     newEvent
   ) => {
 
-    if (
-      !isRankedEvent(
-        newEvent.name
-      )
-    ) {
-      return;
-    }
-
-    await scheduleEvent(
-      newEvent.id
-    );
+    const eventName = newEvent.name ?? '(unbekannt)';
 
     console.log(
-      `🔄 Ranked Event aktualisiert: ${newEvent.name}`
+      `📥 guildScheduledEventUpdate ausgelöst: "${eventName}" (ID: ${newEvent.id})`
     );
+
+    try {
+
+      if (
+        !newEvent.name ||
+        !isRankedEvent(
+          newEvent.name
+        )
+      ) {
+        console.log(
+          `⏭️ Kein Ranked Event, ignoriert: "${eventName}"`
+        );
+        return;
+      }
+
+      console.log(
+        `🔄 Ranked Event aktualisiert: "${eventName}"`
+      );
+
+      await scheduleEvent(
+        newEvent.id
+      );
+
+    } catch (err) {
+
+      console.error(
+        `❌ Fehler in guildScheduledEventUpdate (Event: "${eventName}", ID: ${newEvent.id}):`,
+        err
+      );
+    }
   }
 );
+
 client.on(
   'guildScheduledEventDelete',
   async (event) => {
 
-    clearEventTimeouts(
-      event.id
-    );
+    const eventName = event.name ?? '(unbekannt)';
 
     console.log(
-      `🗑️ Ranked Event gelöscht: ${event.name}`
+      `📥 guildScheduledEventDelete ausgelöst: "${eventName}" (ID: ${event.id})`
     );
+
+    try {
+
+      clearEventTimeouts(
+        event.id
+      );
+
+      console.log(
+        `🗑️ Ranked Event gelöscht: "${eventName}"`
+      );
+
+    } catch (err) {
+
+      console.error(
+        `❌ Fehler in guildScheduledEventDelete (Event: "${eventName}", ID: ${event.id}):`,
+        err
+      );
+    }
   }
 );
 // ---------------------------------------------------------------------------
