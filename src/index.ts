@@ -200,6 +200,13 @@ async function sendEventReminder(
       return;
     }
 
+    // Event-Daten neu laden um aktuelle userCount zu bekommen
+    const freshEvent =
+      await guild.scheduledEvents.fetch(
+        eventId,
+        { force: true }
+      );
+
     const reminderChannel =
       guild.channels.cache.get(
         RANKED_EVENT_CHANNEL
@@ -213,7 +220,11 @@ async function sendEventReminder(
     }
 
     const interested =
-      event.userCount ?? 0;
+      freshEvent.userCount ?? 0;
+
+    console.log(
+      `📊 Event "${event.name}" hat ${interested} interessierte Spieler`
+    );
 
     const eventLink =
       `https://discord.com/events/${guild.id}/${event.id}`;
