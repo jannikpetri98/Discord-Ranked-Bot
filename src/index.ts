@@ -215,18 +215,22 @@ async function sendEventReminder(
     const interested =
       event.userCount ?? 0;
 
+    const eventLink =
+      `https://discord.com/events/${guild.id}/${event.id}`;
+
     if (type === '6h') {
 
       await reminderChannel.send({
-
-content:
+        content: [
 `@everyone
 
 ⚔️ In 6 Stunden beginnt unser Gilden Ranked!
 
 Heute zählt jeder Sieg, jede Entscheidung und jedes Teamplay.
 
-🏆 Zeigt was ihr könnt und kämpft für die Spitze der Rangliste!`
+🏆 Zeigt was ihr könnt und kämpft für die Spitze der Rangliste!`,
+          `Event-Link: ${eventLink}`,
+        ].join('\n\n')
       });
 
       console.log(
@@ -261,6 +265,9 @@ Jeder einzelne Spieler macht den Unterschied!`;
 
 Die Arena wartet bereits auf euch. Macht euch bereit für spannende Matches und wichtige Ranglistenpunkte!`;
     }
+
+    message +=
+      `\n\nEvent-Link: ${eventLink}`;
 
     await reminderChannel.send({
       content: message
