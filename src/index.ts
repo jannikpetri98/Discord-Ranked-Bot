@@ -202,10 +202,11 @@ async function sendEventReminder(
 
     // Event-Daten neu laden um aktuelle userCount zu bekommen
     const freshEvent =
-      await guild.scheduledEvents.fetch(
-        eventId,
-        { force: true }
-      );
+      await guild.scheduledEvents.fetch({
+        guildScheduledEvent: eventId,
+        withUserCount: true,
+        force: true,
+      });
 
     const reminderChannel =
       guild.channels.cache.get(
